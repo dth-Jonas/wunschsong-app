@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Party Leaderboard - Live Beamer View</title>
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #030712;
+            --glass-bg: rgba(255, 255, 255, 0.04);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --accent-purple: #8b5cf6;
+            --accent-cyan: #06b6d4;
+            --accent-amber: #f59e0b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * { box-sizing: border-box; font-family: 'SF Pro Display', 'Inter', -apple-system, sans-serif; margin: 0; padding: 0; }
+        
+        body { 
+            background: var(--bg-dark); 
+            background-image: 
+                radial-gradient(circle at 20% 20%, rgba(139, 92, 246, 0.25) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(6, 182, 212, 0.2) 0%, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-main); 
+            padding: 30px; 
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+        }
+
+        header { text-align: center; margin-bottom: 30px; }
+        h1 { font-size: 3rem; font-weight: 800; background: linear-gradient(135deg, #a78bfa, #38bdf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -1px; text-transform: uppercase; }
+        .party-subtitle { font-size: 1.2rem; color: var(--text-muted); margin-top: 5px; font-weight: 600; }
+
+        .board-container { max-width: 900px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+
+        .rank-card {
+            background: var(--glass-bg); backdrop-filter: blur(25px); border: 1px solid var(--glass-border);
+            border-radius: 20px; padding: 16px 28px; display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); transition: all 0.4s;
+        }
+
+        .rank-card.top-1 { border-color: rgba(245, 158, 11, 0.6); background: rgba(245, 158, 11, 0.12); box-shadow: 0 0 35px rgba(245, 158, 11, 0.25); transform: scale(1.02); }
+        .rank-card.top-2 { border-color: rgba(148, 163, 184, 0.5); background: rgba(148, 163, 184, 0.1); }
+        .rank-card.top-3 { border-color: rgba(217, 119, 6, 0.4); background: rgba(217, 119, 6, 0.08); }
+
+        .rank-badge { font-size: 1.8rem; font-weight: 800; width: 50px; }
+        .top-1 .rank-badge { color: #fbbf24; }
+        .top-2 .rank-badge { color: #cbd5e1; }
+        .top-3 .rank-badge { color: #f59e0b; }
+
+        .user-details { flex: 1; margin-left: 15px; }
+        .user-name { font-size: 1.5rem; font-weight: 700; color: #fff; }
+        .user-title { font-size: 0.9rem; color: var(--text-muted); font-weight: 500; }
+
+        .user-points { font-size: 1.8rem; font-weight: 800; color: var(--accent-cyan); }
+        .top-1 .user-points { color: #fbbf24; }
+
+        footer { text-align: center; font-size: 1rem; color: var(--text-muted); margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--glass-border); }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; justify-content: center; align-items: center; z-index: 100; }
+        .modal-box { background: #111827; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid var(--glass-border); max-width: 400px; width: 90%; }
+        input[type="text"] { width: 100%; padding: 14px; background: #1f2937; border: 1px solid #374151; color: white; border-radius: 12px; font-size: 18px; text-transform: uppercase; text-align: center; margin: 15px 0; font-weight: 800; }
+        button { width: 100%; padding: 14px; background: var(--accent-purple); color: white; border: none; border-radius: 12px; font-weight: 700; font-size: 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div class="modal-overlay" id="partyModal" style="display: none;">
+        <div class="modal-box">
+            <h2>📺 Beamer-View starten</h2>
+            <p style="color: var(--text-muted); font-size: 14px; margin-top: 5px;">Gib die Party-ID ein:</p>
+            <input type="text" id="partyInput" placeholder="z. B. SOMMER2026">
+            <button onclick="startBeamerFromInput()">Starten 🚀</button>
+        </div>
+    </div>
+
+    <header>
+        <h1>🏆 Live Leaderboard</h1>
+        <div class="party-subtitle" id="partyDisplayTitle">Party: ---</div>
+    </header>
+
+    <div class="board-container" id="boardList">
+        <p style="text-align: center; color: var(--text-muted);">Lade Rangliste...</p>
+    </div>
+
+    <footer>
+        Scanne den QR-Code & mache mit! Wünsche dir Songs & stimme ab für Punkte! 🔥
+    </footer>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBdNCQUL0UYFPC_gZVHsjDaBO8vPJmbAy4",
+            authDomain: "wunschsong-app.firebaseapp.com",
+            databaseURL: "https://wunschsong-app-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "wunschsong-app",
+            storageBucket: "wunschsong-app.firebasestorage.app",
+            messagingSenderId: "57218702242",
+            appId: "1:57218702242:web:1d6e8d98c16b38bae4f0fb"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        let partyId = urlParams.get('party');
+
+        if (!partyId) {
+            document.getElementById("partyModal").style.display = "flex";
+        } else {
+            partyId = partyId.toUpperCase();
+            initBeamer(partyId);
+        }
+
+        window.startBeamerFromInput = function() {
+            const inputVal = document.getElementById("partyInput").value.trim().toUpperCase();
+            if(inputVal) {
+                window.location.href = `beamer.html?party=${inputVal}`;
+            }
+        };
+
+        function getRankTitle(pts) {
+            if (pts >= 60) return "👑 VIP Legende";
+            if (pts >= 35) return "🥇 Party-Macher";
+            if (pts >= 15) return "🥈 Tanz-Starter";
+            return "🥉 Party-Muffel";
+        }
+
+        function initBeamer(pId) {
+            document.getElementById("partyModal").style.display = "none";
+            document.getElementById("partyDisplayTitle").innerText = `Party-ID: ${pId}`;
+
+            const guestsRef = ref(db, `parties/${pId}/gaeste`);
+
+            onValue(guestsRef, (snap) => {
+                const container = document.getElementById("boardList");
+                container.innerHTML = "";
+                const data = snap.val();
+
+                if (!data) {
+                    container.innerHTML = "<p style='text-align: center; color: var(--text-muted); font-size: 1.2rem;'>Noch keine aktiven Gäste registriert.</p>";
+                    return;
+                }
+
+                const sorted = Object.values(data).sort((a,b) => b.points - a.points);
+
+                sorted.slice(0, 8).forEach((u, i) => {
+                    const div = document.createElement("div");
+                    const topClass = i < 3 ? `top-${i+1}` : '';
+                    div.className = `rank-card ${topClass}`;
+
+                    const medal = i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`;
+
+                    div.innerHTML = `
+                        <div class="rank-badge">${medal}</div>
+                        <div class="user-details">
+                            <div class="user-name">${u.name}</div>
+                            <div class="user-title">${getRankTitle(u.points)}</div>
+                        </div>
+                        <div class="user-points">${u.points} <span style="font-size: 1rem; font-weight: normal;">Pkt</span></div>
+                    `;
+                    container.appendChild(div);
+                });
+            });
+        }
+    </script>
+</body>
+</html>

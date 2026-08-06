@@ -2,10 +2,722 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wunschsong App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>VibeSync - Party App</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎧</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --glass-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+            --accent-purple: #8b5cf6;
+            --accent-purple-glow: rgba(139, 92, 246, 0.3);
+            --accent-cyan: #06b6d4;
+            --accent-green: #10b981;
+            --accent-amber: #f59e0b;
+            --accent-red: #ef4444;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        html, body { touch-action: manipulation; -webkit-text-size-adjust: 100%; overflow-x: hidden; }
+        * { box-sizing: border-box; font-family: 'SF Pro Display', 'Inter', -apple-system, sans-serif; margin: 0; padding: 0; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 4px; }
+
+        body { 
+            background: #05070e; 
+            background-image: radial-gradient(circle at 15% 15%, rgba(139, 92, 246, 0.15) 0%, transparent 45%), radial-gradient(circle at 85% 85%, rgba(6, 182, 212, 0.12) 0%, transparent 45%);
+            background-attachment: fixed; color: var(--text-main); 
+            padding-top: max(calc(env(safe-area-inset-top) + 38px), 52px); padding-right: max(16px, env(safe-area-inset-right)); padding-bottom: max(20px, env(safe-area-inset-bottom)); padding-left: max(16px, env(safe-area-inset-left));
+            max-width: 440px; margin: 0 auto; min-height: 100vh; 
+        }
+
+        .glass-card { background: var(--glass-bg); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); border: 1px solid var(--glass-border); box-shadow: var(--glass-highlight), 0 16px 36px rgba(0, 0, 0, 0.4); border-radius: 20px; padding: 20px; position: relative; margin-bottom: 16px; }
+
+        .user-bar { display: flex; justify-content: space-between; align-items: center; }
+        .user-info { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; margin-right: 10px; }
+        .user-name-wrapper { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; }
+        .user-name { font-size: 15px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+        .user-rank-text { font-size: 11px; color: var(--accent-amber); font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+        .rank-progress-bg { background: rgba(255,255,255,0.08); height: 6px; border-radius: 3px; overflow: hidden; margin-top: 6px; width: 100%; }
+        .rank-progress-fill { background: linear-gradient(90deg, var(--accent-amber), var(--accent-cyan)); height: 100%; width: 0%; transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+        .btn-icon-head { background: rgba(255, 255, 255, 0.08); border: 1px solid var(--glass-border); color: var(--text-main); box-shadow: var(--glass-highlight); width: 40px; height: 40px; border-radius: 12px; font-size: 17px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .btn-icon-head:active { transform: scale(0.92); }
+
+        .wish-inline-card { background: linear-gradient(135deg, rgba(139, 92, 246, 0.18), rgba(99, 102, 241, 0.08)); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); border: 1px solid rgba(139, 92, 246, 0.4); box-shadow: var(--glass-highlight), 0 12px 30px rgba(139, 92, 246, 0.15); border-radius: 22px; padding: 20px; margin-bottom: 16px; }
+
+        .grid-menu { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+        .tile-card { background: var(--glass-bg); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); border: 1px solid var(--glass-border); box-shadow: var(--glass-highlight); border-radius: 20px; padding: 16px; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between; min-height: 104px; position: relative; transition: transform 0.15s ease, border-color 0.2s; }
+        .tile-card:active { transform: scale(0.96); }
+        .tile-card.active-poll { border-color: var(--accent-purple); background: rgba(139, 92, 246, 0.15); }
+        .tile-icon { font-size: 24px; margin-bottom: 8px; }
+        .tile-title { font-size: 14px; font-weight: 700; color: #fff; }
+        .tile-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+        @keyframes pulseDot { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.3; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
+        .live-dot { display: inline-block; margin-left: 6px; animation: pulseDot 1.5s infinite; }
+
+        input[type="text"] { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); color: var(--text-main); padding: 14px 16px; border-radius: 14px; font-size: 14px; outline: none; margin-bottom: 12px; }
+        input[type="text"]:focus { border-color: var(--accent-purple); background: rgba(255, 255, 255, 0.08); }
+
+        .btn-liquid { width: 100%; background: linear-gradient(135deg, var(--accent-purple), #6366f1); border: none; color: white; padding: 14px; border-radius: 14px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 16px var(--accent-purple-glow); transition: transform 0.15s ease; }
+        .btn-liquid:active { transform: scale(0.97); }
+        .btn-liquid:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-glass { width: 100%; justify-content: center; padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.06); border:1px solid var(--glass-border); color:#fff; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; cursor: pointer; }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.82); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); display: flex; justify-content: center; align-items: center; z-index: 100; padding: 16px; }
+        .modal-box { background: rgba(15, 21, 36, 0.96); border: 1px solid var(--glass-border); box-shadow: var(--glass-highlight), 0 20px 40px rgba(0,0,0,0.6); border-radius: 24px; width: 100%; max-width: 400px; max-height: 88vh; overflow-y: auto; padding: 22px; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+        .modal-header h3 { font-size: 17px; font-weight: 800; }
+        .btn-close { background: rgba(255, 255, 255, 0.08); border: none; color: var(--text-muted); width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-weight: bold; }
+
+        .emoji-picker-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 16px; }
+        .emoji-opt { background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); font-size: 20px; padding: 8px; border-radius: 12px; cursor: pointer; text-align: center; transition: transform 0.15s ease, border-color 0.2s; }
+        .emoji-opt:active { transform: scale(0.9); }
+        .emoji-opt.selected { border-color: var(--accent-purple); background: rgba(139, 92, 246, 0.25); }
+
+        .poll-card-item { background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 16px; padding: 14px; margin-bottom: 12px; }
+        .poll-btn { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-main); padding: 12px 14px; border-radius: 12px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 13px; cursor: pointer; transition: opacity 0.2s; }
+        .poll-btn.selected { border-color: var(--accent-green); background: rgba(16, 185, 129, 0.18); color: #6ee7b7; }
+        .poll-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .poll-bar-bg { background: rgba(255, 255, 255, 0.06); height: 5px; border-radius: 3px; overflow: hidden; margin-bottom: 8px; }
+        .poll-bar-fill { background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan)); height: 100%; width: 0%; transition: width 0.4s; }
+
+        .my-song-item { padding: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 14px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .status-badge { font-size: 10px; font-weight: 800; padding: 4px 10px; border-radius: 8px; text-transform: uppercase; }
+        .status-offen { background: rgba(255,255,255,0.08); color: var(--text-muted); }
+        .status-gespielt { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .status-abgelehnt { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+
+        .xp-info-box { background:rgba(255,255,255,0.03); border:1px solid var(--glass-border); padding:16px; border-radius:16px; margin-bottom:12px; font-size:12px; color:var(--text-muted); }
+        .xp-info-box ul { padding-left: 18px; margin-bottom: 12px; line-height: 1.8; }
+        .xp-info-box li strong { float: right; font-weight: 800; }
+    </style>
 </head>
 <body>
-    <h1>🎧 DJ Wunschsong App ist bereit!</h1>
+
+    <div class="modal-overlay" id="partyCodeModal">
+        <div class="modal-box" style="text-align: center;">
+            <div id="loginStep1">
+                <h2 style="font-size: 22px; margin-bottom: 6px;">🎉 VibeSync Login</h2>
+                <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 18px;">Schritt 1: Gib den PIN ein oder scanne den QR-Code.</p>
+                <input type="text" id="partyPinInput" maxlength="4" placeholder="PIN eingeben" style="text-align: center; font-size: 22px; font-weight: 800; letter-spacing: 4px; margin-bottom: 14px;">
+                <button class="btn-liquid" onclick="checkPartyPin();">Weiter ➔</button>
+                <div style="margin: 12px 0; color: var(--text-muted); font-size: 11px; text-transform: uppercase;">oder</div>
+                <button class="btn-glass" onclick="openScannerModal();">📷 QR-Code scannen</button>
+            </div>
+            <div id="loginStep2" style="display: none;">
+                <h2 style="font-size: 20px; margin-bottom: 4px;">👤 Profil erstellen</h2>
+                <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 14px;">Schritt 2: Wähle deinen Namen & Profil-Icon.</p>
+                <label style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:6px; text-align:left;">Profil-Emoji wählen:</label>
+                <div class="emoji-picker-grid" id="loginEmojiGrid">
+                    <div class="emoji-opt selected" onclick="selectEmoji('🎧', this)">🎧</div>
+                    <div class="emoji-opt" onclick="selectEmoji('🔥', this)">🔥</div>
+                    <div class="emoji-opt" onclick="selectEmoji('💃', this)">💃</div>
+                    <div class="emoji-opt" onclick="selectEmoji('🕺', this)">🕺</div>
+                    <div class="emoji-opt" onclick="selectEmoji('🍸', this)">🍸</div>
+                    <div class="emoji-opt" onclick="selectEmoji('⚡', this)">⚡</div>
+                    <div class="emoji-opt" onclick="selectEmoji('👑', this)">👑</div>
+                    <div class="emoji-opt" onclick="selectEmoji('🎉', this)">🎉</div>
+                    <div class="emoji-opt" onclick="selectEmoji('🥳', this)">🥳</div>
+                    <div class="emoji-opt" onclick="selectEmoji('🪩', this)">🪩</div>
+                </div>
+                <input type="text" id="guestNameInput" placeholder="Dein Name / Tisch" style="text-align: center; font-weight: 700; margin-bottom: 14px;">
+                <div style="display:flex; gap:8px;">
+                    <button class="btn-glass" onclick="goBackToStep1()" style="flex: 0.4;">Zurück</button>
+                    <button class="btn-liquid" onclick="finalizeJoin();" style="flex: 0.6;">Party Beitreten 🚀</button>
+                </div>
+            </div>
+            <p id="codeError" style="color: #f87171; font-size: 12px; margin-top: 10px; font-weight: bold;"></p>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalScanner" style="display: none;">
+        <div class="modal-box" style="text-align: center; max-width: 360px;">
+            <div class="modal-header">
+                <h3>📷 QR-Code Scannen</h3>
+                <button class="btn-close" onclick="stopScanner()">✕</button>
+            </div>
+            <div id="reader" style="width: 100%; border-radius: 14px; overflow: hidden; border: 1px solid var(--accent-purple);"></div>
+            <p id="scannerStatus" style="font-size: 11px; color: var(--text-muted); margin-top: 10px;">Kamera auf den QR-Code richten...</p>
+        </div>
+    </div>
+
+    <div class="user-bar glass-card" id="userHeaderCard">
+        <div class="user-info">
+            <div class="user-name-wrapper">
+                <span class="user-name"><span id="displayGuestEmoji">🎧</span> <span id="displayGuestName">Gast</span></span>
+                <span class="user-rank-text" id="displayGuestRank">🥉 Newcomer</span>
+            </div>
+            <div class="rank-progress-bg">
+                <div class="rank-progress-fill" id="headerRankFill"></div>
+            </div>
+        </div>
+        <div style="display: flex; gap: 6px; flex-shrink: 0;">
+            <button class="btn-icon-head" onclick="openModal('modalRanks');" title="Punkte">🏆</button>
+            <button class="btn-icon-head" onclick="openModal('modalSettings');" title="Einstellungen">⚙️</button>
+        </div>
+    </div>
+
+    <div class="wish-inline-card">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+            <div style="font-size: 22px; background: rgba(255,255,255,0.1); border-radius: 10px; padding: 4px 8px;">🎵</div>
+            <div>
+                <div style="font-size: 15px; font-weight: 800; color: #fff;">Song wünschen</div>
+                <div style="font-size: 11px; color: #c7d2fe;">Titel & Interpret einsenden (+10 XP)</div>
+            </div>
+        </div>
+        <input type="text" id="songInput" placeholder="Interpret & Songtitel..." style="margin-bottom: 8px;">
+        <button class="btn-liquid" id="sendBtn" onclick="wunschAbsenden();">Abschicken 🚀 (+10 XP)</button>
+        <p id="statusMsg" style="margin-top: 6px; font-size: 12px; text-align: center; font-weight: bold; min-height: 16px;"></p>
+    </div>
+
+    <div class="grid-menu">
+        <div class="tile-card" onclick="openModal('modalMySongs');">
+            <div class="tile-icon">📋</div>
+            <div>
+                <div class="tile-title">Meine Wünsche</div>
+                <div class="tile-sub">Status ansehen</div>
+            </div>
+        </div>
+        <div class="tile-card" id="tilePoll" onclick="openModal('modalPoll');">
+            <div class="tile-icon">📊</div>
+            <div>
+                <div class="tile-title" style="display:flex; align-items:center;">Live-Votings <span id="pulsingDot" class="live-dot" style="display:none;">🟢</span></div>
+                <div class="tile-sub" id="subPollText">0 Aktiv</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalMySongs" style="display: none;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>📋 Meine Wünsche</h3>
+                <button class="btn-close" onclick="closeModal('modalMySongs')">✕</button>
+            </div>
+            <div id="mySongsContainer">Lade Wünsche...</div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalPoll" style="display: none;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>📊 Live-Votings</h3>
+                <button class="btn-close" onclick="closeModal('modalPoll')">✕</button>
+            </div>
+            <div id="multiPollContainer">Keine Umfragen vorhanden.</div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalRanks" style="display: none;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>🏆 Dein Punkte-Konto</h3>
+                <button class="btn-close" onclick="closeModal('modalRanks')">✕</button>
+            </div>
+            <div style="background:rgba(139,92,246,0.12); border:1px solid var(--glass-border); padding:14px; border-radius:16px; text-align:center; margin-bottom:12px;">
+                <div style="font-size:24px; font-weight:800; color:var(--accent-amber);" id="modalPointsTotal">0 XP</div>
+                <div style="font-size:12px; font-weight:bold; color:#fff; margin-top:2px;" id="modalRankTitle">🥉 Newcomer</div>
+                <div class="rank-progress-bg"><div class="rank-progress-fill" id="modalRankFill"></div></div>
+            </div>
+            
+            <div class="xp-info-box">
+                <strong style="color:#fff; display:block; margin-bottom:6px;">📈 So sammelst du XP:</strong>
+                <ul style="list-style-type: none; padding-left:0;">
+                    <li>Wunsch abgegeben: <strong style="color:var(--accent-cyan);">+10 XP</strong></li>
+                    <li>Wunsch wird gespielt: <strong style="color:var(--accent-green);">+15 XP</strong></li>
+                    <li>Wunsch abgelehnt: <strong style="color:var(--accent-red);">-10 XP</strong></li>
+                    <li>Bei Umfrage abgestimmt: <strong style="color:var(--accent-cyan);">+5 XP</strong></li>
+                </ul>
+                <strong style="color:#fff; display:block; margin-bottom:6px; margin-top:16px;">🎖️ Die Rang-Stufen:</strong>
+                <ul style="list-style-type: none; padding-left:0;">
+                    <li>🥉 Newcomer <strong>0 - 49 XP</strong></li>
+                    <li>🥈 Party-Profi <strong>50 - 149 XP</strong></li>
+                    <li>🥇 Vibe-Master <strong>150 - 299 XP</strong></li>
+                    <li>👑 Vibe-Gott <strong style="color:var(--accent-amber);">300+ XP</strong></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalSettings" style="display: none;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>⚙️ Einstellungen & Info</h3>
+                <button class="btn-close" onclick="closeModal('modalSettings')">✕</button>
+            </div>
+            <label style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:6px;">Emoji ändern:</label>
+            <div class="emoji-picker-grid" id="editEmojiGrid">
+                <div class="emoji-opt" onclick="selectEmoji('🎧', this)">🎧</div>
+                <div class="emoji-opt" onclick="selectEmoji('🔥', this)">🔥</div>
+                <div class="emoji-opt" onclick="selectEmoji('💃', this)">💃</div>
+                <div class="emoji-opt" onclick="selectEmoji('🕺', this)">🕺</div>
+                <div class="emoji-opt" onclick="selectEmoji('🍸', this)">🍸</div>
+                <div class="emoji-opt" onclick="selectEmoji('⚡', this)">⚡</div>
+                <div class="emoji-opt" onclick="selectEmoji('👑', this)">👑</div>
+                <div class="emoji-opt" onclick="selectEmoji('🎉', this)">🎉</div>
+                <div class="emoji-opt" onclick="selectEmoji('🥳', this)">🥳</div>
+                <div class="emoji-opt" onclick="selectEmoji('🪩', this)">🪩</div>
+            </div>
+            <input type="text" id="editNameInput" placeholder="Dein Name" style="margin-top:4px;">
+            <button class="btn-liquid" onclick="updateGuestName();" style="margin-bottom:12px;">Name Speichern</button>
+            <button class="btn-liquid" onclick="leavePartySession('Du hast die Party verlassen.', true);" style="background:#ef4444; margin-bottom:16px;">🚪 Logout</button>
+
+            <div style="border-top:1px solid var(--glass-border); padding-top:12px; font-size:11px; color:var(--text-muted);">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span>App:</span> <strong style="color:#fff;">VibeSync v1.2.0 MVP</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span>Entwickler:</span> <strong style="color:#fff;">Jonas Salzer (RS Media)</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FIREBASE INIT DATABASE & APP LOGIC -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, push, onValue, set, get, update, onDisconnect } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBdNCQUL0UYFPC_gZVHsjDaBO8vPJmbAy4",
+            authDomain: "wunschsong-app.firebaseapp.com",
+            databaseURL: "https://wunschsong-app-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "wunschsong-app",
+            storageBucket: "wunschsong-app.firebasestorage.app",
+            messagingSenderId: "57218702242",
+            appId: "1:57218702242:web:1d6e8d98c16b38bae4f0fb"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        if (!localStorage.getItem("guestId")) {
+            localStorage.setItem("guestId", "guest_" + Math.random().toString(36).substr(2, 9));
+        }
+        
+        const guestId = localStorage.getItem("guestId");
+        let partyId = sessionStorage.getItem("currentPartyId") || "";
+        let isCooldown = false;
+        let cooldownSeconds = 120;
+        let cooldownTimer = null;
+        let selectedEmoji = localStorage.getItem("guestEmoji") || "🎧";
+        let verifiedPartyId = null;
+        let html5QrCode = null;
+        let cachedPollsData = {};
+
+        window.onload = () => {
+            const logoutMsg = sessionStorage.getItem("logoutReason");
+            if (logoutMsg) {
+                document.getElementById("codeError").innerText = logoutMsg;
+                sessionStorage.removeItem("logoutReason");
+            }
+        };
+
+        function getRankInfo(points) {
+            if (points >= 300) return { title: "👑 Vibe-Gott", progress: 100 };
+            if (points >= 150) return { title: "🥇 Vibe-Master", progress: Math.min(100, Math.round(((points - 150) / 150) * 100)) };
+            if (points >= 50) return { title: "🥈 Party-Profi", progress: Math.min(100, Math.round(((points - 50) / 100) * 100)) };
+            return { title: "🥉 Newcomer", progress: Math.min(100, Math.round((points / 50) * 100)) };
+        }
+
+        function updateSendBtnState() {
+            const sendBtn = document.getElementById("sendBtn");
+            if (!sendBtn) return;
+            
+            if (isCooldown) {
+                sendBtn.disabled = true;
+            } else {
+                sendBtn.disabled = false;
+                sendBtn.innerText = "Abschicken 🚀 (+10 XP)";
+            }
+        }
+
+        function startCooldown(seconds) {
+            isCooldown = true;
+            let remaining = seconds;
+            updateSendBtnState();
+
+            if(cooldownTimer) clearInterval(cooldownTimer);
+            cooldownTimer = setInterval(() => {
+                remaining--;
+                const sendBtn = document.getElementById("sendBtn");
+                if(isCooldown && sendBtn) {
+                    sendBtn.innerText = `⏳ Warte noch ${remaining}s`;
+                }
+                if(remaining <= 0) {
+                    clearInterval(cooldownTimer);
+                    isCooldown = false;
+                    updateSendBtnState();
+                }
+            }, 1000);
+        }
+
+        window.selectEmoji = function(emoji, el) {
+            selectedEmoji = emoji;
+            const parent = el.parentElement;
+            parent.querySelectorAll(".emoji-opt").forEach(child => child.classList.remove("selected"));
+            el.classList.add("selected");
+            localStorage.setItem("guestEmoji", emoji);
+        };
+
+        window.checkPartyPin = async function() {
+            const pin = document.getElementById("partyPinInput").value.trim();
+            const err = document.getElementById("codeError");
+            if(!pin) { 
+                err.innerText = "Bitte PIN eingeben!"; 
+                return; 
+            }
+
+            const snap = await get(ref(db, 'parties'));
+            const data = snap.val() || {};
+            let foundId = null;
+            Object.keys(data).forEach(pKey => {
+                if(data[pKey].pin === pin && data[pKey].status !== 'beendet') {
+                    foundId = pKey;
+                }
+            });
+
+            if(foundId) {
+                verifiedPartyId = foundId; 
+                err.innerText = "";
+                document.getElementById("loginStep1").style.display = "none";
+                document.getElementById("loginStep2").style.display = "block";
+            } else { 
+                err.innerText = "Code falsch oder Party beendet!"; 
+            }
+        };
+
+        window.goBackToStep1 = function() {
+            document.getElementById("loginStep2").style.display = "none";
+            document.getElementById("loginStep1").style.display = "block";
+        };
+
+        window.finalizeJoin = function() {
+            const name = document.getElementById("guestNameInput").value.trim();
+            if(!name) { 
+                document.getElementById("codeError").innerText = "Bitte Namen eintragen!"; 
+                return; 
+            }
+            localStorage.setItem("guestName", name);
+            document.getElementById("editNameInput").value = name;
+            sessionStorage.setItem("currentPartyId", verifiedPartyId);
+            partyId = verifiedPartyId;
+            document.getElementById("partyCodeModal").style.display = "none";
+            initPartySession(partyId);
+        };
+
+        window.openScannerModal = function() {
+            document.getElementById("modalScanner").style.display = "flex";
+            if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+            html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 200, height: 220 } },
+                (decodedText) => {
+                    let pin = decodedText;
+                    if(decodedText.includes('pin=')) {
+                        const match = decodedText.match(/pin=([^&]+)/);
+                        if(match) pin = match[1];
+                    }
+                    document.getElementById("partyPinInput").value = pin;
+                    stopScanner(); 
+                    checkPartyPin();
+                }, () => {}
+            ).catch(() => {});
+        };
+
+        window.stopScanner = function() {
+            if (html5QrCode) {
+                html5QrCode.stop()
+                    .then(() => document.getElementById("modalScanner").style.display = "none")
+                    .catch(() => document.getElementById("modalScanner").style.display = "none");
+            } else {
+                document.getElementById("modalScanner").style.display = "none";
+            }
+        };
+
+        const savedName = localStorage.getItem("guestName");
+        if(savedName) document.getElementById("guestNameInput").value = savedName;
+        const qrPin = new URLSearchParams(window.location.search).get('pin');
+        if (qrPin) document.getElementById("partyPinInput").value = qrPin;
+
+        if (partyId && savedName) {
+            initPartySession(partyId);
+        } else { 
+            sessionStorage.removeItem("currentPartyId"); 
+            document.getElementById("partyCodeModal").style.display = "flex"; 
+        }
+
+        function initPartySession(pId) {
+            get(ref(db, `parties/${pId}`)).then(snap => {
+                if(!snap.exists() || snap.val().status === 'beendet') { 
+                    leavePartySession("Party abgelaufen oder gelöscht.", true); 
+                    return; 
+                }
+                document.getElementById("partyCodeModal").style.display = "none";
+                const guestRef = ref(db, `parties/${pId}/gaeste/${guestId}`);
+                const currentName = localStorage.getItem("guestName") || "Gast";
+                const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                update(guestRef, { 
+                    isOnline: true, 
+                    name: currentName, 
+                    emoji: selectedEmoji, 
+                    joinedTime: nowTime, 
+                    lastActive: Date.now() 
+                });
+                onDisconnect(guestRef).update({ isOnline: false });
+
+                listenToPartyData(pId);
+                setInterval(() => {
+                    renderPollsUI();
+                }, 1000);
+            });
+        }
+
+        window.leavePartySession = function(banReason, skipDbUpdate = false) {
+            const doLogout = () => {
+                sessionStorage.removeItem("currentPartyId");
+                if (typeof banReason === 'string' && banReason.trim() !== "") {
+                    sessionStorage.setItem("logoutReason", banReason);
+                }
+                window.location.reload(); 
+            };
+
+            if(partyId && !skipDbUpdate) {
+                update(ref(db, `parties/${partyId}/gaeste/${guestId}`), { isOnline: false })
+                    .then(doLogout).catch(doLogout);
+            } else {
+                doLogout();
+            }
+        };
+
+        window.updateGuestName = function() {
+            const newName = document.getElementById("editNameInput").value.trim();
+            if(newName && partyId) {
+                localStorage.setItem("guestName", newName);
+                update(ref(db, `parties/${partyId}/gaeste/${guestId}`), { name: newName, emoji: selectedEmoji });
+                document.getElementById("displayGuestName").innerText = newName;
+                closeModal('modalSettings');
+            }
+        };
+
+        window.openModal = (id) => document.getElementById(id).style.display = "flex";
+        window.closeModal = (id) => document.getElementById(id).style.display = "none";
+
+        window.wunschAbsenden = function() {
+            if(isCooldown) return;
+            const songInput = document.getElementById("songInput");
+            const songText = songInput.value.trim();
+            if(!songText || !partyId) return;
+
+            push(ref(db, `parties/${partyId}/wunsche`), {
+                name: localStorage.getItem("guestName") || "Gast",
+                guestId: guestId, 
+                emoji: selectedEmoji, 
+                song: songText,
+                uhrzeit: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                status: 'offen', 
+                timestamp: Date.now()
+            });
+
+            awardPoints(10);
+            songInput.value = "";
+            document.getElementById("statusMsg").innerText = "🎉 Wunsch gesendet! (+10 XP)";
+            setTimeout(() => { document.getElementById("statusMsg").innerText = ""; }, 3000);
+            
+            startCooldown(cooldownSeconds);
+        };
+
+        function awardPoints(ptsAdd) {
+            if (!partyId) return;
+            const myRef = ref(db, `parties/${partyId}/gaeste/${guestId}`);
+            get(myRef).then(snap => {
+                const data = snap.val() || { points: 0 };
+                update(myRef, { points: Math.max(0, (data.points || 0) + ptsAdd) });
+            });
+        }
+
+        window.voteInPoll = function(pollId, optionIdx) {
+            if(!partyId || !guestId) return;
+            
+            const pollRef = ref(db, `parties/${partyId}/umfragen/${pollId}`);
+            get(pollRef).then(snap => {
+                const poll = snap.val();
+                if(!poll || poll.status === 'beendet' || poll.status === 'archiviert') return;
+                
+                const hasVoted = poll.votes && poll.votes[guestId] !== undefined;
+                set(ref(db, `parties/${partyId}/umfragen/${pollId}/votes/${guestId}`), optionIdx);
+                
+                if (!hasVoted) {
+                    awardPoints(5);
+                }
+            });
+        };
+
+        function listenToPartyData(pId) {
+            onValue(ref(db, `parties/${pId}`), snap => { 
+                if (!snap.exists()) {
+                    leavePartySession("Die Party wurde vom DJ gelöscht.", true);
+                } else if (snap.val().status === 'beendet') {
+                    leavePartySession("Die Party wurde beendet.", true);
+                }
+            });
+
+            onValue(ref(db, `parties/${pId}/settings/cooldown`), snap => {
+                if(snap.exists()) cooldownSeconds = parseInt(snap.val()) || 120;
+            });
+            
+            onValue(ref(db, `parties/${pId}/gaeste/${guestId}`), snap => {
+                const gData = snap.val() || {};
+                if (gData.status === 'banned') { 
+                    leavePartySession("Du wurdest vom DJ gesperrt.", false); 
+                    return; 
+                }
+                
+                updateSendBtnState();
+
+                if (gData.name) {
+                    localStorage.setItem("guestName", gData.name);
+                    document.getElementById("displayGuestName").innerText = gData.name;
+                    const editInp = document.getElementById("editNameInput");
+                    if(editInp && document.activeElement !== editInp) {
+                        editInp.value = gData.name;
+                    }
+                }
+
+                if (gData.emoji) {
+                    localStorage.setItem("guestEmoji", gData.emoji);
+                    selectedEmoji = gData.emoji;
+                    document.getElementById("displayGuestEmoji").innerText = gData.emoji;
+                }
+
+                const myPts = gData.points || 0;
+                const rank = getRankInfo(myPts);
+
+                document.getElementById("modalPointsTotal").innerText = `${myPts} XP`;
+                document.getElementById("modalRankTitle").innerText = rank.title;
+                document.getElementById("displayGuestRank").innerText = rank.title;
+                
+                document.getElementById("headerRankFill").style.width = `${rank.progress}%`;
+                document.getElementById("modalRankFill").style.width = `${rank.progress}%`;
+            });
+
+            onValue(ref(db, `parties/${pId}/wunsche`), snap => {
+                const data = snap.val() || {};
+                const container = document.getElementById("mySongsContainer");
+                if (!container) return;
+                container.innerHTML = "";
+
+                const currentGuestName = localStorage.getItem("guestName") || "";
+
+                const myWishes = Object.keys(data)
+                    .map(k => ({ id: k, ...data[k] }))
+                    .filter(w => w && (w.guestId === guestId || (currentGuestName && w.name === currentGuestName)) && w.status !== 'geloescht')
+                    .sort((a,b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+                if (myWishes.length === 0) {
+                    container.innerHTML = "<p style='color:var(--text-muted); font-size:13px; text-align:center; padding:20px;'>Noch keine Wünsche eingesendet.</p>";
+                    return;
+                }
+
+                myWishes.forEach(w => {
+                    const div = document.createElement("div");
+                    div.className = "my-song-item";
+                    let badgeClass = "status-offen";
+                    let badgeText = "⏳ Offen";
+                    if (w.status === 'gespielt') { badgeClass = "status-gespielt"; badgeText = "✅ Gespielt"; }
+                    if (w.status === 'abgelehnt') { badgeClass = "status-abgelehnt"; badgeText = "❌ Abgelehnt"; }
+
+                    div.innerHTML = `
+                        <div>
+                            <strong style="font-size:14px; color:#fff;">${w.song || 'Unbenannt'}</strong><br>
+                            <small style="color:var(--text-muted); font-size:11px;">Eingereicht um ${w.uhrzeit || 'k.A.'}</small>
+                        </div>
+                        <span class="status-badge ${badgeClass}">${badgeText}</span>
+                    `;
+                    container.appendChild(div);
+                });
+            });
+
+            onValue(ref(db, `parties/${pId}/umfragen`), snap => { 
+                cachedPollsData = snap.val() || {}; 
+                renderPollsUI(); 
+            });
+        }
+
+        function renderPollsUI() {
+            const container = document.getElementById("multiPollContainer");
+            if(!container) return; 
+            container.innerHTML = "";
+
+            const allPolls = Object.keys(cachedPollsData).map(k => ({ id: k, ...cachedPollsData[k] }));
+            const activePolls = allPolls.filter(p => p.status === 'live' || p.status === 'beendet');
+            
+            const liveCount = allPolls.filter(p => p.status === 'live').length;
+            document.getElementById("subPollText").innerText = `${liveCount} Aktiv`;
+            
+            const dot = document.getElementById("pulsingDot");
+            if (dot) dot.style.display = liveCount > 0 ? "inline-block" : "none";
+
+            if (activePolls.length === 0) { 
+                container.innerHTML = "<p style='color:var(--text-muted); text-align:center; font-size:12px; padding:20px;'>Keine aktiven Umfragen.</p>"; 
+                return; 
+            }
+
+            activePolls.forEach(poll => {
+                const card = document.createElement("div");
+                card.className = "poll-card-item";
+                
+                const isFinished = poll.status === 'beendet' || poll.status === 'archiviert';
+                const myVote = (poll.votes && poll.votes[guestId] !== undefined) ? poll.votes[guestId] : null;
+                const votes = poll.votes || {};
+                const totalVotes = Object.keys(votes).length;
+                
+                const counts = new Array(poll.optionen ? poll.optionen.length : 0).fill(0);
+                Object.values(votes).forEach(v => {
+                    if(counts[v] !== undefined) counts[v]++;
+                });
+
+                let optionsHTML = "";
+                if(poll.optionen) {
+                    poll.optionen.forEach((optText, idx) => {
+                        if(!optText) return;
+                        const optVotes = counts[idx] || 0;
+                        const percent = totalVotes > 0 ? Math.round((optVotes / totalVotes) * 100) : 0;
+                        const isSelected = (myVote === idx);
+
+                        optionsHTML += `
+                            <button class="poll-btn ${isSelected ? 'selected' : ''}" 
+                                    ${isFinished ? 'disabled' : ''} 
+                                    onclick="voteInPoll('${poll.id}', ${idx})">
+                                <span>${isSelected ? '✅ ' : ''}${optText}</span>
+                                <small style="opacity:0.8;">${percent}% (${optVotes})</small>
+                            </button>
+                            <div class="poll-bar-bg">
+                                <div class="poll-bar-fill" style="width:${percent}%;"></div>
+                            </div>
+                        `;
+                    });
+                }
+
+                let badgeHtml = '';
+                if (isFinished) badgeHtml = '<span style="font-size:10px; color:#f87171; font-weight:bold;">🏁 BEENDET</span>';
+                else badgeHtml = '<span style="font-size:10px; color:var(--accent-green); font-weight:bold;">🟢 LIVE</span>';
+
+                card.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <h4 style="font-size:14px; font-weight:700; color:#fff;">${poll.frage}</h4>
+                        ${badgeHtml}
+                    </div>
+                    ${optionsHTML}
+                `;
+                container.appendChild(card);
+            });
+        }
+    </script>
 </body>
 </html>

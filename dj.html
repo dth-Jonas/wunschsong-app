@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>VibeSync - DJ Cockpit</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎧</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.04);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --glass-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+            --accent-purple: #8b5cf6;
+            --accent-cyan: #06b6d4;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-amber: #f59e0b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * { box-sizing: border-box; font-family: 'SF Pro Display', 'Inter', sans-serif; margin: 0; padding: 0; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 4px; }
+
+        body { 
+            background: #05070e; 
+            background-image: radial-gradient(circle at 10% 10%, rgba(139, 92, 246, 0.12) 0%, transparent 40%); 
+            background-attachment: fixed; color: var(--text-main); 
+            padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+            height: 100vh; overflow: hidden; display: flex; flex-direction: column; 
+        }
+
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-shrink: 0; }
+        h1 { font-size: 24px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 10px; }
+        .version-tag { font-size: 11px; background: rgba(255,255,255,0.08); padding: 3px 8px; border-radius: 8px; color: var(--text-muted); font-weight: 600; }
+
+        .live-clock { background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border); padding: 8px 16px; border-radius: 12px; font-family: monospace; font-size: 16px; font-weight: 800; color: var(--accent-cyan); letter-spacing: 1px; }
+
+        .btn { padding: 10px 18px; border-radius: 12px; border: none; font-weight: 700; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; transition: transform 0.1s; }
+        .btn:active { transform: scale(0.97); }
+        .btn-purple { background: linear-gradient(135deg, var(--accent-purple), #6366f1); color: white; }
+        .btn-green { background: var(--accent-green); color: white; }
+        .btn-red { background: var(--accent-red); color: white; }
+        .btn-ghost { background: transparent; border: 1px solid var(--glass-border); color: var(--text-main); }
+        .btn-small { padding: 6px 12px; font-size: 12px; min-height: 34px; border-radius: 8px; }
+
+        .main-layout { display: flex; gap: 18px; flex: 1; overflow: hidden; }
+        .left-panel { flex: 1.1; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; padding-right: 4px; }
+        .right-panel { flex: 0.9; background: var(--glass-bg); backdrop-filter: blur(30px); border: 1px solid var(--glass-border); border-radius: 22px; display: flex; flex-direction: column; overflow: hidden; }
+
+        .glass-card { background: var(--glass-bg); backdrop-filter: blur(30px); border: 1px solid var(--glass-border); box-shadow: var(--glass-highlight); border-radius: 22px; padding: 20px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+
+        input[type="text"], input[type="number"], input[type="date"], select { 
+            width: 100%; background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border); 
+            color: #fff; padding: 12px 16px; border-radius: 12px; font-size: 14px; margin-bottom: 10px; outline: none; 
+        }
+        select option { background-color: #1a2035; color: #ffffff; padding: 10px; }
+        input[type="text"]:focus, select:focus { border-color: var(--accent-purple); }
+
+        .quick-btn { background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); color: var(--text-main); padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; margin-right: 4px; margin-bottom: 6px; }
+        
+        .song-item { background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--glass-border); padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(16px); display: flex; justify-content: center; align-items: center; z-index: 100; padding: 20px; }
+        .modal-container { background: rgba(15, 21, 36, 0.96); border: 1px solid var(--glass-border); border-radius: 24px; width: 100%; max-width: 600px; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; }
+        .modal-header { padding: 18px 24px; border-bottom: 1px solid var(--glass-border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h3 { font-size: 18px; font-weight: 800; }
+        .modal-body { padding: 22px; overflow-y: auto; flex: 1; }
+        .btn-close { background: rgba(255,255,255,0.08); border: none; color: white; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; }
+
+        .dj-poll-card { background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 16px; padding: 16px; margin-bottom: 12px; }
+        .dj-poll-card.archived { border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.03); }
+        .poll-res-bar { background: rgba(255,255,255,0.06); height: 6px; border-radius: 3px; overflow: hidden; margin-top: 4px; }
+        .poll-res-fill { background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan)); height: 100%; width: 0%; transition: width 0.3s; }
+
+        .party-item { background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 14px; padding: 14px 18px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .poster-box { background: #fff; color: #000; padding: 24px; border-radius: 20px; text-align: center; max-width: 360px; margin: 0 auto; }
+        #qrcode canvas, #qrcode img { margin: 12px auto; }
+
+        .panel-header { padding: 14px 20px; background: rgba(0,0,0,0.2); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); }
+        .panel-header h3 { font-size: 15px; font-weight: 800; }
+        .badge { background: var(--accent-purple); color: white; font-size: 12px; padding: 3px 8px; border-radius: 10px; font-weight: bold; }
+        
+        .stat-box { background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); padding: 12px; border-radius: 14px; text-align: center; }
+        .stat-val { font-size: 20px; font-weight: 800; color: var(--accent-amber); margin-top: 2px; }
+        .stat-lbl { font-size: 11px; color: var(--text-muted); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>
+            <h1>🎛️ VibeSync DJ <span class="version-tag">v1.2.0 MVP</span></h1>
+            <span id="headerActiveParty" style="font-size:13px; color:var(--accent-green); margin-top:2px;">Lade...</span>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <div class="live-clock" id="djClockDisplay">00:00:00</div>
+            <button class="btn btn-ghost" id="btnHeaderPin" onclick="openModal('modalPoster')" style="display:none;">PIN: <strong id="textCodeDisplay" style="color:#fff;">----</strong></button>
+            <button class="btn btn-ghost" id="btnHeaderGuests" onclick="openModal('modalGaeste')" style="display:none;"><span id="textGuestCount">0 Online</span></button>
+            <button class="btn btn-ghost" id="btnHeaderSettings" onclick="openModal('modalSettings')" style="display:none;">⚙️ Settings</button>
+            <button class="btn btn-purple" onclick="openModal('modalPartyManager')">🎉 Partys & Archiv</button>
+        </div>
+    </header>
+
+    <div class="main-layout" id="activePartyLayout" style="display:none;">
+        
+        <div class="left-panel">
+            
+            <div class="glass-card">
+                <h3 style="margin-bottom: 12px; font-size:16px; font-weight: 800;">📊 Neue Umfrage Erstellen</h3>
+                
+                <div style="margin-bottom: 8px;">
+                    <button class="quick-btn" onclick="setPreset('song')">🎵 Welcher Song?</button>
+                    <button class="quick-btn" onclick="setPreset('genre')">📻 Genres</button>
+                    <button class="quick-btn" onclick="setPreset('tempo')">🔥 Tempo</button>
+                    <button class="quick-btn" onclick="setPreset('sing')">🎤 Mädels vs. Jungs</button>
+                </div>
+
+                <input type="text" id="pollQuestionInput" placeholder="Frage eingeben...">
+                <div class="grid-2" style="margin-bottom: 12px;">
+                    <input type="text" class="optInput" id="opt0" placeholder="Option 1">
+                    <input type="text" class="optInput" id="opt1" placeholder="Option 2">
+                    <input type="text" class="optInput" id="opt2" placeholder="Option 3">
+                    <input type="text" class="optInput" id="opt3" placeholder="Option 4">
+                </div>
+
+                <button class="btn btn-purple" style="width: 100%;" onclick="createPoll()">🚀 Umfrage Live Starten</button>
+            </div>
+
+            <div class="glass-card" style="flex:1; overflow-y:auto;">
+                <h3 style="margin-bottom: 12px; font-size:16px; font-weight: 800; color:var(--accent-cyan);">📊 Aktive & Beendete Umfragen</h3>
+                <div id="djActivePollsContainer">Keine Umfragen vorhanden.</div>
+
+                <div style="margin-top:16px; border-top:1px solid var(--glass-border); padding-top:12px;">
+                    <button class="btn btn-ghost" style="width:100%; justify-content:space-between;" onclick="toggleArchivedPolls()">
+                        <span style="font-size: 13px; font-weight: 700;">📦 Archivierte Umfragen</span>
+                        <span id="archivedToggleIcon">▶ Show</span>
+                    </button>
+                    <div id="djArchivedPollsContainer" style="display:none; margin-top:12px;"></div>
+                </div>
+            </div>
+            
+        </div>
+
+        <div class="right-panel">
+            <div class="panel-header">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <h3>🎵 Offene Wünsche</h3>
+                    <select id="wishSortSelect" onchange="renderWishList()" style="width:auto; margin:0; padding:4px 8px; font-size:11px; background:rgba(255,255,255,0.06);">
+                        <option value="time-desc">Neueste zuerst</option>
+                        <option value="time-asc">Älteste zuerst</option>
+                    </select>
+                </div>
+                <span id="wishCountBadge" class="badge">0</span>
+            </div>
+            
+            <div id="persistentWishList" style="flex: 1.2; overflow-y: auto;">
+                <p style="padding: 20px; color: var(--text-muted); text-align: center; font-size: 13px;">Keine offenen Wünsche.</p>
+            </div>
+
+            <div class="panel-header" style="border-top: 1px solid var(--glass-border); background: rgba(0,0,0,0.3);">
+                <h3 style="color: var(--text-muted);">📜 Wunsch-Historie</h3>
+                <span id="historyCountBadge" class="badge" style="background:rgba(255,255,255,0.08); color:var(--text-muted);">0</span>
+            </div>
+            
+            <div id="persistentHistoryList" style="flex: 0.8; overflow-y: auto; background: rgba(0,0,0,0.15);">
+                <p style="padding: 15px; color: var(--text-muted); text-align: center; font-size: 12px;">Noch keine gespielten Songs.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- EMPTY STATE -->
+    <div class="glass-card" id="noPartyLayout" style="text-align:center; padding:50px; margin:auto; max-width:460px;">
+        <div style="font-size:50px; margin-bottom:12px;">🎉</div>
+        <h2 style="font-size:24px; font-weight:800; color:#fff; margin-bottom:8px;">Willkommen im DJ Cockpit</h2>
+        <p style="color:var(--text-muted); margin-bottom:24px; font-size:14px;">Aktuell läuft keine aktive Party. Starte eine neue Veranstaltung oder öffne das Archiv.</p>
+        <button class="btn btn-purple" onclick="openCreatePartyForm()" style="width:100%; margin-bottom:10px;">➕ Neue Party anlegen</button>
+        <button class="btn btn-ghost" onclick="openModal('modalPartyManager')" style="width:100%;">📜 Party Archiv öffnen</button>
+    </div>
+
+    <!-- MODAL: COOLDOWN EINSTELLUNGEN -->
+    <div class="modal-overlay" id="modalSettings" style="display: none;">
+        <div class="modal-container" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3>⚙️ Party Einstellungen</h3>
+                <button class="btn-close" onclick="closeModal('modalSettings')">✕</button>
+            </div>
+            <div class="modal-body">
+                <label style="font-size:13px; font-weight:600; color:var(--text-muted); display:block; margin-bottom:6px;">Sperrzeit / Cooldown (Sekunden):</label>
+                <input type="number" id="settingCooldown" value="120">
+                <p style="font-size:12px; color:var(--text-muted); margin-bottom:20px;">Standard: 120 Sekunden Sperre pro Gast nach einem Wunsch.</p>
+                <button class="btn btn-green" style="width:100%;" onclick="savePartySettings()">💾 Einstellungen Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: PARTY MANAGER -->
+    <div class="modal-overlay" id="modalPartyManager" style="display: none;">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3>🎉 Party Zentrale</h3>
+                <button class="btn-close" onclick="closeModal('modalPartyManager')">✕</button>
+            </div>
+            <div class="modal-body">
+                <button class="btn btn-purple" onclick="openCreatePartyForm()" style="width: 100%; margin-bottom: 16px;">➕ Neue Party anlegen</button>
+                <div id="partyListContainer">Lade Partys...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: PARTY STATISTIK -->
+    <div class="modal-overlay" id="modalPartyStats" style="display: none;">
+        <div class="modal-container" style="max-width: 680px;">
+            <div class="modal-header">
+                <h3 id="statsTitle">📊 Party Statistik</h3>
+                <button class="btn-close" onclick="closeModal('modalPartyStats')">✕</button>
+            </div>
+            <div class="modal-body" id="statsContent">
+                Lade Auswertung...
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: PARTY EDIT -->
+    <div class="modal-overlay" id="modalPartyEdit" style="display: none;">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3 id="editFormTitle">🎉 Party erstellen</h3>
+                <button class="btn-close" onclick="closeModal('modalPartyEdit')">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editPartyKey">
+                <label style="font-size: 12px; color: var(--text-muted);">Party Name:</label>
+                <input type="text" id="editPartyName" placeholder="Sommerfest 2026">
+                
+                <div class="grid-2">
+                    <div>
+                        <label style="font-size: 12px; color: var(--text-muted);">Datum:</label>
+                        <input type="date" id="editPartyDate">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: var(--text-muted);">Party-ID:</label>
+                        <input type="text" id="editPartyId" placeholder="ID">
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div>
+                        <label style="font-size: 12px; color: var(--text-muted);">Sicherheits-PIN:</label>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="editPartyPin" maxlength="4" readonly style="letter-spacing:3px; font-weight:bold; text-align:center;">
+                            <button class="btn btn-ghost" id="btnRenewPin" onclick="renewPartyPin()" style="margin-bottom:10px;" title="Erneuern">🔄</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: var(--text-muted);">Status:</label>
+                        <select id="editPartyStatus" onchange="handleStatusDateChange()"></select>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 16px;">
+                    <button class="btn btn-green" onclick="savePartyDetails()" style="flex: 1;">💾 Speichern</button>
+                    <button class="btn btn-red" id="btnDeleteParty" onclick="deleteCurrentParty()" style="display: none;">🗑️ Löschen</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: POSTER MIT SHARE -->
+    <div class="modal-overlay" id="modalPoster" style="display: none;">
+        <div class="modal-container" style="max-width: 440px;">
+            <div class="modal-header">
+                <h3>🖨️ QR-Code & Teilen</h3>
+                <button class="btn-close" onclick="closeModal('modalPoster')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="poster-box">
+                    <h2 style="font-size: 24px; font-weight: 800;" id="posterPartyTitle">🎵 VIBESYNC</h2>
+                    <p style="font-size: 12px; color: #555;">Scanne den Code oder gib den PIN ein:</p>
+                    <div id="qrcode"></div>
+                    <div style="background: #f1f5f9; padding: 10px; border-radius: 12px; font-weight: 800; font-size: 24px; letter-spacing: 4px; color:#0f172a;" id="posterPinCode">----</div>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 18px;">
+                    <button class="btn btn-purple" onclick="window.print()" style="flex: 1;">🖨️ Drucken</button>
+                    <button class="btn btn-green" onclick="sharePartyLink()" style="flex: 1;">📤 Teilen</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: GÄSTE MODERATION -->
+    <div class="modal-overlay" id="modalGaeste" style="display: none;">
+        <div class="modal-container" style="max-width:680px;">
+            <div class="modal-header">
+                <h3>👥 Gäste Live-Moderation</h3>
+                <button class="btn-close" onclick="closeModal('modalGaeste')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; background:rgba(255,255,255,0.03); padding:8px 12px; border-radius:12px; border:1px solid var(--glass-border);">
+                    <label style="font-size:12px; color:var(--text-muted);">Sortierung:</label>
+                    <select id="guestSortSelect" style="width:auto; margin:0; padding:6px 10px;" onchange="renderGuestList()">
+                        <option value="xp-desc">🏆 XP (Höchste zuerst)</option>
+                        <option value="xp-asc">📉 XP (Niedrigste zuerst)</option>
+                        <option value="name-asc">🔤 Name (A – Z)</option>
+                        <option value="name-desc">🔠 Name (Z – A)</option>
+                    </select>
+                </div>
+                <div id="gaesteListe">Lade Gäste...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FIREBASE INIT DATABASE -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, onValue, update, set, remove, push, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBdNCQUL0UYFPC_gZVHsjDaBO8vPJmbAy4",
+            authDomain: "wunschsong-app.firebaseapp.com",
+            databaseURL: "https://wunschsong-app-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "wunschsong-app",
+            storageBucket: "wunschsong-app.firebasestorage.app",
+            messagingSenderId: "57218702242",
+            appId: "1:57218702242:web:1d6e8d98c16b38bae4f0fb"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        let activePartyId = localStorage.getItem("djActivePartyId") || "";
+        let rawPartiesData = {};
+        let cachedDjPollsData = {};
+        let cachedGuestsData = {};
+        let cachedWishesData = {};
+        let showArchivedPolls = false;
+        let currentPartyUnsubscribes = [];
+
+        window.openModal = (id) => document.getElementById(id).style.display = "flex";
+        window.closeModal = (id) => document.getElementById(id).style.display = "none";
+
+        function clearPartyListeners() {
+            currentPartyUnsubscribes.forEach(unsub => {
+                if (typeof unsub === 'function') unsub();
+            });
+            currentPartyUnsubscribes = [];
+        }
+
+        window.sharePartyLink = function() {
+            const currentUrl = window.location.href;
+            const baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf("/"));
+            const pin = document.getElementById("posterPinCode").innerText;
+            const partyName = document.getElementById("posterPartyTitle").innerText;
+            const shareUrl = `${baseUrl}/index.html?pin=${pin}`;
+
+            if (navigator.share) {
+                navigator.share({ title: `VibeSync - ${partyName}`, text: `Komm in die Party! PIN: ${pin}`, url: shareUrl }).catch(() => {});
+            } else {
+                navigator.clipboard.writeText(shareUrl).then(() => alert("Link kopiert: " + shareUrl));
+            }
+        };
+
+        setInterval(() => {
+            const clock = document.getElementById("djClockDisplay");
+            if(clock) clock.innerText = new Date().toLocaleTimeString('de-DE');
+        }, 1000);
+
+        window.toggleArchivedPolls = function() {
+            showArchivedPolls = !showArchivedPolls;
+            document.getElementById("djArchivedPollsContainer").style.display = showArchivedPolls ? "block" : "none";
+            document.getElementById("archivedToggleIcon").innerText = showArchivedPolls ? "▼ Hide" : "▶ Show";
+        };
+
+        window.setPreset = function(type) {
+            const q = document.getElementById("pollQuestionInput");
+            const o0 = document.getElementById("opt0"); const o1 = document.getElementById("opt1");
+            const o2 = document.getElementById("opt2"); const o3 = document.getElementById("opt3");
+            
+            o0.value = ""; o1.value = ""; o2.value = ""; o3.value = "";
+
+            if(type === 'song') { q.value = "Welchen Song wollt ihr als Nächstes?"; } 
+            else if(type === 'genre') { q.value = "Welches Genre wollt ihr hören?"; o0.value = "80er/90er"; o1.value = "2000er"; o2.value = "Pop"; o3.value = "EDM"; } 
+            else if(type === 'tempo') { q.value = "Mehr Tempo?"; o0.value = "Schneller 🔥"; o1.value = "Chillen ☕"; } 
+            else if(type === 'sing') { q.value = "Mädels vs. Jungs?"; o0.value = "Mädels 💃"; o1.value = "Jungs 🕺"; }
+        };
+
+        window.handleStatusDateChange = function() {
+            const st = document.getElementById("editPartyStatus").value;
+            const dateInput = document.getElementById("editPartyDate");
+            if(st === 'aktiv' && !dateInput.value) {
+                dateInput.value = new Date().toISOString().split('T')[0];
+            }
+        };
+
+        onValue(ref(db, 'parties'), snap => {
+            rawPartiesData = snap.val() || {};
+            renderPartyManagerList();
+            
+            const activeKeys = Object.keys(rawPartiesData).filter(k => {
+                const p = rawPartiesData[k];
+                return p.status === 'aktiv';
+            });
+
+            if(activeKeys.length === 0) {
+                activePartyId = ""; 
+                localStorage.removeItem("djActivePartyId");
+                clearPartyListeners();
+                document.getElementById("headerActiveParty").innerText = "Keine Party aktiv";
+                document.getElementById("activePartyLayout").style.display = "none";
+                document.getElementById("noPartyLayout").style.display = "block";
+                document.getElementById("btnHeaderPin").style.display = "none";
+                document.getElementById("btnHeaderGuests").style.display = "none";
+                document.getElementById("btnHeaderSettings").style.display = "none";
+                return;
+            }
+
+            document.getElementById("noPartyLayout").style.display = "none";
+            document.getElementById("activePartyLayout").style.display = "flex";
+            document.getElementById("btnHeaderPin").style.display = "inline-flex";
+            document.getElementById("btnHeaderGuests").style.display = "inline-flex";
+            document.getElementById("btnHeaderSettings").style.display = "inline-flex";
+
+            if(!activePartyId || !rawPartiesData[activePartyId] || rawPartiesData[activePartyId].status !== 'aktiv') {
+                activePartyId = activeKeys[0]; 
+                localStorage.setItem("djActivePartyId", activePartyId);
+                clearPartyListeners();
+                initDJSession(activePartyId);
+            } else if (currentPartyUnsubscribes.length === 0 && activePartyId) {
+                initDJSession(activePartyId);
+            }
+
+            const current = rawPartiesData[activePartyId];
+            if(current) {
+                document.getElementById("headerActiveParty").innerText = `Aktive Party: ${current.name || activePartyId}`;
+                document.getElementById("textCodeDisplay").innerText = current.pin || '----';
+            }
+        });
+
+        function renderPartyManagerList() {
+            const container = document.getElementById("partyListContainer");
+            container.innerHTML = "";
+            const keys = Object.keys(rawPartiesData);
+            if(keys.length === 0) { 
+                container.innerHTML = "<p style='color:var(--text-muted); text-align:center;'>Keine Partys vorhanden.</p>"; 
+                return; 
+            }
+
+            keys.forEach(pId => {
+                const p = rawPartiesData[pId];
+                if (!p.status && !p.name) {
+                    remove(ref(db, `parties/${pId}`));
+                    return;
+                }
+
+                const isCurrent = (pId === activePartyId);
+                const isBeendet = p.status === 'beendet';
+
+                const div = document.createElement("div");
+                div.className = "party-item";
+                div.innerHTML = `
+                    <div>
+                        <div style="font-weight:700; font-size:15px; margin-bottom:4px;">
+                            ${p.name || pId} ${isCurrent ? '⭐' : ''}
+                            <span style="font-size:10px; padding:2px 6px; border-radius:6px; background:${p.status==='aktiv'?'rgba(16,185,129,0.2)':(isBeendet?'rgba(239,68,68,0.2)':'rgba(245,158,11,0.2)')}; color:${p.status==='aktiv'?'#34d399':(isBeendet?'#f87171':'var(--accent-amber)')}; font-weight:bold;">
+                                ${(p.status||'geplant').toUpperCase()}
+                            </span>
+                        </div>
+                        <small style="color:var(--text-muted);">Datum: <strong style="color:#fff;">${p.date || 'k.A.'}</strong> | PIN: <strong style="color:#fff;">${p.pin || '----'}</strong></small>
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        ${isBeendet ? `<button class="btn btn-ghost" style="border-color:var(--accent-amber); color:var(--accent-amber);" onclick="viewPartyStats('${pId}')">📊 Statistik</button>` : `<button class="btn btn-purple" onclick="selectPartyToControl('${pId}')">⚡ Steuern</button>`}
+                        <button class="btn btn-ghost" onclick="openEditPartyForm('${pId}')">✏️ Edit</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        window.viewPartyStats = function(pId) {
+            const p = rawPartiesData[pId];
+            if (!p) return;
+            document.getElementById("statsTitle").innerText = `📊 Statistik: ${p.name || pId}`;
+            openModal('modalPartyStats');
+
+            const wunscheArray = Object.values(p.wunsche || {});
+            const totalWunsche = wunscheArray.length;
+            const gespieltWunsche = wunscheArray.filter(w => w.status === 'gespielt').length;
+            const quota = totalWunsche > 0 ? Math.round((gespieltWunsche / totalWunsche) * 100) : 0;
+
+            const gaesteArray = Object.values(p.gaeste || {});
+            const totalGaeste = gaesteArray.length;
+            let mvpGuest = null, maxPts = -1;
+            gaesteArray.forEach(g => { 
+                if((g.points || 0) > maxPts) { maxPts = g.points || 0; mvpGuest = g; } 
+            });
+
+            const umfragenArray = Object.values(p.umfragen || {});
+            const totalUmfragen = umfragenArray.length;
+
+            document.getElementById("statsContent").innerHTML = `
+                <div class="grid-4" style="margin-bottom:16px;">
+                    <div class="stat-box"><div class="stat-lbl">Gäste</div><div class="stat-val">${totalGaeste}</div></div>
+                    <div class="stat-box"><div class="stat-lbl">Wünsche</div><div class="stat-val">${totalWunsche}</div></div>
+                    <div class="stat-box"><div class="stat-lbl">Gespielt</div><div class="stat-val" style="color:var(--accent-green);">${gespieltWunsche}</div></div>
+                    <div class="stat-box"><div class="stat-lbl">Votings</div><div class="stat-val" style="color:var(--accent-cyan);">${totalUmfragen}</div></div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03); border:1px solid var(--glass-border); padding:16px; border-radius:16px; margin-bottom:16px;">
+                    <div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">🏆 Party MVP (Top Gast):</div>
+                    ${mvpGuest ? `<div style="display:flex; justify-content:space-between; align-items:center;"><strong style="font-size:16px; color:#fff;">${mvpGuest.emoji || '🎧'} ${mvpGuest.name || 'Gast'}</strong><strong style="font-size:16px; color:var(--accent-amber);">${mvpGuest.points || 0} XP</strong></div>` : `<span style="color:var(--text-muted); font-size:12px;">Keine Punkte vergeben.</span>`}
+                </div>
+                <div style="background:rgba(255,255,255,0.03); border:1px solid var(--glass-border); padding:16px; border-radius:16px; margin-bottom:16px;">
+                    <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;"><span>🎵 Erfüllungsquote Wünsche:</span><strong style="color:var(--accent-green);">${quota}%</strong></div>
+                    <div class="poll-res-bar"><div class="poll-res-fill" style="width:${quota}%; background:var(--accent-green);"></div></div>
+                </div>
+            `;
+        };
+
+        window.selectPartyToControl = function(pId) {
+            if(!pId || !rawPartiesData[pId]) return;
+
+            const activeKeys = Object.keys(rawPartiesData).filter(k => rawPartiesData[k].status === 'aktiv' && k !== pId);
+            if (activeKeys.length > 0) {
+                if(!confirm("Achtung! Es läuft bereits eine aktive Party. Möchtest du die aktuelle Party beenden und stattdessen diese steuern?")) {
+                    return;
+                }
+                activeKeys.forEach(k => update(ref(db, `parties/${k}`), { status: 'beendet' }));
+            }
+
+            if(rawPartiesData[pId].status !== 'aktiv') {
+                update(ref(db, `parties/${pId}`), { status: 'aktiv' });
+            }
+
+            activePartyId = pId; 
+            localStorage.setItem("djActivePartyId", pId); 
+            
+            const current = rawPartiesData[pId];
+            document.getElementById("headerActiveParty").innerText = `Aktive Party: ${current.name || pId}`;
+            document.getElementById("textCodeDisplay").innerText = current.pin || '----';
+
+            clearPartyListeners();
+            initDJSession(pId);
+            
+            closeModal('modalPartyManager');
+        };
+
+        window.openCreatePartyForm = function() {
+            document.getElementById("editPartyKey").value = "";
+            document.getElementById("editPartyName").value = "Neue Party";
+            document.getElementById("editPartyDate").value = new Date().toISOString().split('T')[0];
+            document.getElementById("editPartyId").value = "PARTY-" + Math.random().toString(36).substr(2, 4).toUpperCase();
+            document.getElementById("editPartyPin").value = Math.floor(1000 + Math.random() * 9000).toString();
+            document.getElementById("btnRenewPin").style.display = "none";
+            document.getElementById("editPartyStatus").innerHTML = `<option value="geplant">🟡 Geplant</option><option value="aktiv">🟢 Aktiv (Live)</option>`;
+            document.getElementById("btnDeleteParty").style.display = "none";
+            openModal('modalPartyEdit');
+        };
+
+        window.openEditPartyForm = function(pId) {
+            const p = rawPartiesData[pId];
+            if(!p) return;
+            document.getElementById("editPartyKey").value = pId;
+            document.getElementById("editPartyName").value = p.name || '';
+            document.getElementById("editPartyDate").value = p.date || new Date().toISOString().split('T')[0];
+            document.getElementById("editPartyId").value = pId;
+            document.getElementById("editPartyPin").value = p.pin || '1234';
+            document.getElementById("btnRenewPin").style.display = "inline-flex";
+            document.getElementById("editPartyStatus").innerHTML = `
+                <option value="geplant" ${p.status==='geplant'?'selected':''}>🟡 Geplant</option>
+                <option value="aktiv" ${p.status==='aktiv'?'selected':''}>🟢 Aktiv (Live)</option>
+                <option value="beendet" ${p.status==='beendet'?'selected':''}>🔴 Beendet</option>
+            `;
+            document.getElementById("btnDeleteParty").style.display = "inline-block";
+            openModal('modalPartyEdit');
+        };
+
+        window.renewPartyPin = function() {
+            if (confirm("⚠️ PIN wirklich erneuern? Alte Aushänge werden sofort ungültig!")) {
+                document.getElementById("editPartyPin").value = Math.floor(1000 + Math.random() * 9000).toString();
+            }
+        };
+
+        window.savePartyDetails = function() {
+            const oldKey = document.getElementById("editPartyKey").value;
+            const newId = document.getElementById("editPartyId").value.trim().toUpperCase();
+            const newStatus = document.getElementById("editPartyStatus").value;
+            if(!newId) return;
+
+            if(oldKey && oldKey !== newId) {
+                remove(ref(db, `parties/${oldKey}`));
+            }
+
+            if(newStatus === 'aktiv') { 
+                const activeKeys = Object.keys(rawPartiesData).filter(k => rawPartiesData[k].status === 'aktiv' && k !== newId);
+                if (activeKeys.length > 0) {
+                    activeKeys.forEach(k => update(ref(db, `parties/${k}`), { status: 'beendet' }));
+                    alert("Hinweis: Andere aktive Partys wurden automatisch beendet.");
+                }
+            }
+
+            update(ref(db, `parties/${newId}`), {
+                name: document.getElementById("editPartyName").value.trim(),
+                date: document.getElementById("editPartyDate").value,
+                pin: document.getElementById("editPartyPin").value.trim(),
+                status: newStatus,
+                updatedAt: Date.now()
+            });
+
+            if(newStatus === 'aktiv') { 
+                activePartyId = newId; 
+                localStorage.setItem("djActivePartyId", newId); 
+            }
+            closeModal('modalPartyEdit'); 
+            closeModal('modalPartyManager');
+        };
+
+        window.deleteCurrentParty = function() {
+            const pId = document.getElementById("editPartyKey").value;
+            if(confirm(`Party unwiderruflich löschen?`)) {
+                remove(ref(db, `parties/${pId}`)).then(() => {
+                    if (activePartyId === pId) {
+                        localStorage.removeItem("djActivePartyId"); 
+                        activePartyId = "";
+                    }
+                    closeModal('modalPartyEdit'); 
+                    closeModal('modalPartyManager');
+                });
+            }
+        };
+
+        window.savePartySettings = function() {
+            const cd = document.getElementById("settingCooldown").value;
+            if(!activePartyId) return;
+            set(ref(db, `parties/${activePartyId}/settings/cooldown`), parseInt(cd) || 120);
+            closeModal('modalSettings');
+        };
+
+        function initDJSession(pId) {
+            clearPartyListeners();
+
+            const current = rawPartiesData[pId] || {};
+            document.getElementById("posterPartyTitle").innerText = current.name || pId;
+            document.getElementById("posterPinCode").innerText = current.pin || '----';
+            const qrContainer = document.getElementById("qrcode");
+            if(qrContainer && typeof QRCode !== 'undefined') {
+                qrContainer.innerHTML = "";
+                try { 
+                    new QRCode(qrContainer, { 
+                        text: `${window.location.href.split('/dj.html')[0]}/index.html?pin=${current.pin||''}`, 
+                        width: 200, height: 200 
+                    }); 
+                } catch(e) {}
+            }
+
+            const unsubWishes = onValue(ref(db, `parties/${pId}/wunsche`), snap => { 
+                cachedWishesData = snap.val() || {}; 
+                renderWishList(); 
+            });
+
+            const unsubPolls = onValue(ref(db, `parties/${pId}/umfragen`), snap => { 
+                cachedDjPollsData = snap.val() || {}; 
+                renderDjPollsUI(); 
+            });
+
+            const unsubGuests = onValue(ref(db, `parties/${pId}/gaeste`), snap => {
+                cachedGuestsData = snap.val() || {};
+                const count = Object.values(cachedGuestsData).filter(g => g.isOnline).length;
+                document.getElementById("textGuestCount").innerText = `${count} Online`;
+                renderGuestList();
+            });
+
+            const unsubSettings = onValue(ref(db, `parties/${pId}/settings/cooldown`), snap => {
+                if(snap.exists()) {
+                    document.getElementById("settingCooldown").value = snap.val();
+                }
+            });
+
+            currentPartyUnsubscribes.push(unsubWishes, unsubPolls, unsubGuests, unsubSettings);
+        }
+
+        window.renderWishList = function() {
+            const list = document.getElementById("persistentWishList");
+            const historyList = document.getElementById("persistentHistoryList");
+            const sortOrder = document.getElementById("wishSortSelect").value;
+            list.innerHTML = ""; historyList.innerHTML = "";
+            let openSongs = [], playedSongs = [];
+
+            if(cachedWishesData) {
+                Object.keys(cachedWishesData).forEach(key => {
+                    const item = { id: key, ...cachedWishesData[key] };
+                    if(item.status === 'gespielt' || item.status === 'abgelehnt') playedSongs.push(item);
+                    else if(item.status !== 'geloescht') openSongs.push(item);
+                });
+            }
+
+            if (sortOrder === 'time-asc') openSongs.sort((a,b) => a.timestamp - b.timestamp);
+            else openSongs.sort((a,b) => b.timestamp - a.timestamp);
+            playedSongs.sort((a,b) => (b.playedTimestamp || b.timestamp) - (a.playedTimestamp || a.timestamp));
+
+            if (openSongs.length === 0) list.innerHTML = "<p style='padding: 20px; color: var(--text-muted); text-align: center; font-size: 13px;'>Keine offenen Wünsche.</p>";
+            if (playedSongs.length === 0) historyList.innerHTML = "<p style='padding: 15px; color: var(--text-muted); text-align: center; font-size: 12px;'>Noch keine gespielten Songs.</p>";
+
+            openSongs.forEach(item => {
+                const safeSong = item.song.replace(/'/g, "\\'");
+                const div = document.createElement("div");
+                div.className = "song-item";
+                div.innerHTML = `
+                    <div>
+                        <strong style="font-size:15px; color:#fff;">${item.song}</strong><br>
+                        <small style="color:var(--text-muted);">Von ${item.name || 'Gast'} • 📥 ${item.uhrzeit || ''}</small>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button class="btn btn-purple btn-small" onclick="songToPoll('${safeSong}')">➕ Poll</button>
+                        <button class="btn btn-green btn-small" onclick="setWishStatus('${item.id}', 'gespielt')">✅ Gespielt</button>
+                        <button class="btn btn-red btn-small" onclick="setWishStatus('${item.id}', 'abgelehnt')">❌</button>
+                        <button class="btn btn-ghost btn-small" style="border-color:rgba(255,255,255,0.2);" onclick="removeWishSilent('${item.id}')">🗑️</button>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+
+            playedSongs.forEach(item => {
+                const hDiv = document.createElement("div");
+                hDiv.style.padding = "10px 18px"; hDiv.style.borderBottom = "1px solid var(--glass-border)";
+                hDiv.style.display = "flex"; hDiv.style.justifyContent = "space-between"; hDiv.style.alignItems = "center";
+                hDiv.innerHTML = `
+                    <div>
+                        <strong style="font-size:13px; color:#fff;">${item.song}</strong><br>
+                        <small style="color:var(--text-muted); font-size:11px;">Von ${item.name||'Gast'} • ⏱️ ${item.playedAt || 'k.A.'}</small>
+                    </div>
+                    <span style="font-size:10px; font-weight:bold; padding:3px 6px; border-radius:6px; background:${item.status==='gespielt'?'rgba(16,185,129,0.2)':'rgba(239,68,68,0.2)'}; color:${item.status==='gespielt'?'#34d399':'#f87171'};">
+                        ${item.status==='gespielt'?'✅ Gespielt':'❌ Abgelehnt'}
+                    </span>
+                `;
+                historyList.appendChild(hDiv);
+            });
+
+            document.getElementById("wishCountBadge").innerText = openSongs.length;
+            document.getElementById("historyCountBadge").innerText = playedSongs.length;
+        };
+
+        window.removeWishSilent = (wId) => update(ref(db, `parties/${activePartyId}/wunsche/${wId}`), { status: 'geloescht' });
+
+        window.setWishStatus = function(id, s) {
+            const now = Date.now();
+            get(ref(db, `parties/${activePartyId}/wunsche/${id}`)).then(snap => {
+                const wish = snap.val(); 
+                if(!wish) return;
+                
+                const wasOffen = (wish.status === 'offen');
+                update(ref(db, `parties/${activePartyId}/wunsche/${id}`), { 
+                    status: s, playedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), playedTimestamp: now 
+                });
+
+                if(wish.guestId) {
+                    const guestRef = ref(db, `parties/${activePartyId}/gaeste/${wish.guestId}`);
+                    get(guestRef).then(gSnap => {
+                        const guest = gSnap.val() || { points: 0 };
+                        if (s === 'gespielt') {
+                            update(guestRef, { points: (guest.points || 0) + 15 });
+                        } else if (s === 'abgelehnt' && wasOffen) {
+                            update(guestRef, { points: Math.max(0, (guest.points || 0) - 10) });
+                        }
+                    });
+                }
+            });
+        };
+
+        window.renderGuestList = function() {
+            const container = document.getElementById("gaesteListe");
+            if (!container) return; 
+            container.innerHTML = "";
+            const guestKeys = Object.keys(cachedGuestsData);
+            
+            if (guestKeys.length === 0) { 
+                container.innerHTML = "<p style='color:var(--text-muted); text-align:center;'>Keine Gäste.</p>"; 
+                return; 
+            }
+
+            const sortMode = document.getElementById("guestSortSelect").value;
+            let guests = guestKeys.map(k => ({ id: k, ...cachedGuestsData[k] }));
+
+            guests.sort((a, b) => {
+                const nameA = (a.name || "Gast").toLowerCase(); const nameB = (b.name || "Gast").toLowerCase();
+                if (sortMode === 'xp-asc') return (a.points||0) - (b.points||0);
+                if (sortMode === 'name-asc') return nameA.localeCompare(nameB);
+                if (sortMode === 'name-desc') return nameB.localeCompare(nameA);
+                return (b.points||0) - (a.points||0); 
+            });
+
+            guests.forEach((u, i) => {
+                const isBanned = u.status === 'banned';
+                const div = document.createElement("div");
+                div.style.padding = "12px 0"; div.style.borderBottom = "1px solid var(--glass-border)";
+                div.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <span style="display:flex; align-items:center; gap:6px;">
+                            ${u.isOnline?'🟢':'⚪'} ${u.emoji||'🎧'} 
+                            <strong>#${i+1} <span style="display:inline-block; max-width:120px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; vertical-align:bottom;">${u.name||'Gast'}</span></strong>
+                            <button onclick="editGuestName('${u.id}', '${(u.name||'').replace(/'/g, "\\'")}')" style="background:rgba(255,255,255,0.05); border:1px solid var(--glass-border); border-radius:6px; cursor:pointer; font-size:11px; padding: 2px 6px; color:var(--text-main);">✏️ Edit</button>
+                        </span>
+                        <span style="color:var(--accent-amber); font-weight:bold;">${u.points||0} XP</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:11px; color:var(--text-muted);">📥 Eingeschrieben: ${u.joinedTime||'k.A.'} Uhr</span>
+                        <div style="display:flex; gap:6px;">
+                            ${isBanned ? `
+                                <button class="btn btn-green btn-small" onclick="setGuestStatus('${u.id}', 'active')">✅ Entsperren</button>
+                            ` : `
+                                <button class="btn btn-red btn-small" onclick="setGuestStatus('${u.id}', 'banned')">🚫 Sperren</button>
+                            `}
+                        </div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        };
+
+        window.editGuestName = function(gId, currentName) {
+            const newName = prompt("Neuen Namen für den Gast eingeben:", currentName);
+            if (newName !== null && newName.trim() !== "") {
+                update(ref(db, `parties/${activePartyId}/gaeste/${gId}`), { name: newName.trim() });
+            }
+        };
+
+        window.setGuestStatus = (gId, status) => update(ref(db, `parties/${activePartyId}/gaeste/${gId}`), { status: status });
+
+        function renderDjPollsUI() {
+            const activeContainer = document.getElementById("djActivePollsContainer");
+            const archivedContainer = document.getElementById("djArchivedPollsContainer");
+            if(!activeContainer || !archivedContainer) return;
+            activeContainer.innerHTML = ""; archivedContainer.innerHTML = "";
+
+            const polls = Object.keys(cachedDjPollsData).map(k => ({ id: k, ...cachedDjPollsData[k] }));
+            let activeCount = 0, archivedCount = 0;
+
+            polls.forEach(poll => {
+                let isLive = poll.status === 'live', isFinished = poll.status === 'beendet' || poll.status === 'archiviert';
+
+                const card = document.createElement("div");
+                card.className = `dj-poll-card ${isFinished ? 'archived' : ''}`;
+
+                const userVotes = poll.votes || {};
+                const stimmenArray = new Array(poll.optionen ? poll.optionen.length : 0).fill(0);
+                let gesamtStimmen = 0;
+                Object.values(userVotes).forEach(optIdx => { 
+                    if(stimmenArray[optIdx] !== undefined) { stimmenArray[optIdx]++; gesamtStimmen++; } 
+                });
+
+                let resHTML = "";
+                if(poll.optionen) {
+                    poll.optionen.forEach((optText, index) => {
+                        if(!optText) return;
+                        const prozent = gesamtStimmen > 0 ? Math.round((stimmenArray[index] / gesamtStimmen) * 100) : 0;
+                        resHTML += `
+                            <div style="margin-top:8px;">
+                                <div style="display:flex; justify-content:space-between; font-size:12px;">
+                                    <span>${optText}</span><strong>${stimmenArray[index]} St. (${prozent}%)</strong>
+                                </div>
+                                <div class="poll-res-bar"><div class="poll-res-fill" style="width:${prozent}%;"></div></div>
+                            </div>
+                        `;
+                    });
+                }
+
+                card.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <strong style="font-size:15px; color:#fff;">${poll.frage}</strong>
+                        <span style="font-size:10px; font-weight:bold; padding:3px 8px; border-radius:6px; background:${isFinished?'rgba(239,68,68,0.2)':'rgba(16,185,129,0.2)'}; color:${isFinished?'#f87171':'var(--accent-green)'}; border: 1px solid currentColor;">
+                            ${isFinished?'🏁 BEENDET':'🚀 LIVE'}
+                        </span>
+                    </div>
+                    ${resHTML}
+                    <div style="display:flex; gap:10px; margin-top:14px;">
+                        ${!isFinished ? `<button class="btn btn-red btn-small" style="flex:1;" onclick="stopSinglePoll('${poll.id}')">⏹️ Umfrage Beenden</button>` : ''}
+                        ${poll.status !== 'archiviert' ? `<button class="btn btn-ghost btn-small" style="flex:1;" onclick="archiveSinglePoll('${poll.id}')">📦 Ins Archiv</button>` : ''}
+                    </div>
+                `;
+
+                if (poll.status === 'archiviert') { 
+                    archivedContainer.appendChild(card); 
+                    archivedCount++; 
+                } else { 
+                    activeContainer.appendChild(card); 
+                    activeCount++; 
+                }
+            });
+
+            if (activeCount === 0) activeContainer.innerHTML = "<p style='color:var(--text-muted); font-size:13px;'>Keine aktiven Umfragen.</p>";
+            if (archivedCount === 0) archivedContainer.innerHTML = "<p style='color:var(--text-muted); font-size:12px;'>Keine archivierten Umfragen.</p>";
+        }
+
+        window.songToPoll = function(songName) {
+            document.getElementById("pollQuestionInput").value = "Welchen Song wollt ihr als Nächstes?";
+            for(let i=0; i<4; i++) { 
+                let inp = document.getElementById(`opt${i}`); 
+                if(!inp.value) { inp.value = songName; break; } 
+            }
+        };
+
+        window.createPoll = function() {
+            const frage = document.getElementById("pollQuestionInput").value.trim();
+            const optionInputs = document.querySelectorAll(".optInput");
+            const optionen = []; 
+            optionInputs.forEach(inp => { if(inp.value.trim()) optionen.push(inp.value.trim()); });
+            
+            if(!frage || optionen.length === 0) { alert("Bitte Frage und min. 1 Option eingeben!"); return; }
+
+            push(ref(db, `parties/${activePartyId}/umfragen`), {
+                status: 'live', frage: frage, optionen: optionen, 
+                createdAt: Date.now(), votes: {}
+            });
+            
+            document.getElementById("pollQuestionInput").value = ""; 
+            optionInputs.forEach(inp => inp.value = "");
+        };
+
+        window.stopSinglePoll = function(pollId) {
+            const pollRef = ref(db, `parties/${activePartyId}/umfragen/${pollId}`);
+            update(pollRef, { status: 'beendet', endedAt: Date.now() });
+        };
+
+        window.archiveSinglePoll = (pollId) => update(ref(db, `parties/${activePartyId}/umfragen/${pollId}`), { status: 'archiviert' });
+    </script>
+</body>
+</html>
